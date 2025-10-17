@@ -1,7 +1,7 @@
 {
   "name": "sicbo-node",
   "version": "1.0.0",
-  "description": "Sicbo live proxy API (Node.js) - ready for Render",
+  "description": "Sicbo live proxy API (server.js) - ready for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
