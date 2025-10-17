@@ -1,16 +1,13 @@
 {
-  "name": "sicbo-node",
+  "name": "sicbo-server",
   "version": "1.0.0",
-  "description": "Sicbo live proxy API (server.js) - ready for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "author": "you",
-  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "ws": "^8.13.0"
+    "express": "^4.19.2",
+    "ws": "^8.17.1",
+    "cors": "^2.8.5"
   }
-      }
+}
