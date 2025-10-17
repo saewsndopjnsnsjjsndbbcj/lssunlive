@@ -1,22 +1,16 @@
 {
-  "name": "fastapi-vannhat-hitclub-v1",
+  "name": "sicbo-node",
   "version": "1.0.0",
-  "description": "API to fetch TaiXiu data and provide illustrative prediction/analysis.",
+  "description": "Sicbo live proxy API (Node.js) - ready for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [
-    "taixiu",
-    "api",
-    "nodejs",
-    "express"
-  ],
-  "author": "VANW NHẬT VIP VCL",
-  "license": "ISC",
+  "author": "you",
+  "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.8",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
   }
-}
+      }
