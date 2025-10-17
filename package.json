@@ -1,13 +1,13 @@
 {
-  "name": "sicbo-server",
+  "name": "issunlive",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.17.1",
-    "cors": "^2.8.5"
+    "fastify": "^4.25.2",
+    "@fastify/cors": "^8.4.0",
+    "ws": "^8.17.0"
   }
 }
