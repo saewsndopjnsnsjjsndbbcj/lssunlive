@@ -87,35 +87,47 @@ function startWS() {
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
+
+      // ====== TRƯỜNG HỢP KẾT QUẢ MỚI ======
       if (data.resultRaw && data.sessionId) {
-        const [d1, d2, d3] = data.resultRaw.map(Number);
-        const sid = data.sessionId;
-        if (!sicboCurrentSession || sid > sicboCurrentSession) {
-          sicboCurrentSession = sid;
-          sicboResults.unshift({
-            sid,
-            d1,
-            d2,
-            d3,
-            timestamp: Date.now(),
-          });
-          if (sicboResults.length > MAX_HISTORY_RECORDS) sicboResults.pop();
-          saveHistory();
-          console.log(`📥 Phiên mới ${sid} → [${d1}, ${d2}, ${d3}]`);
+        const dices = String(data.resultRaw).split("").map((n) => parseInt(n));
+        if (dices.length === 3) {
+          const [d1, d2, d3] = dices;
+          const sid = data.sessionId;
+          if (!sicboCurrentSession || sid > sicboCurrentSession) {
+            sicboCurrentSession = sid;
+            sicboResults.unshift({
+              sid,
+              d1,
+              d2,
+              d3,
+              timestamp: Date.now(),
+            });
+            if (sicboResults.length > MAX_HISTORY_RECORDS) sicboResults.pop();
+            saveHistory();
+            console.log(`📥 Phiên mới ${sid} → [${d1}, ${d2}, ${d3}]`);
+          }
         }
-      } else if (Array.isArray(data) && data[1]?.htr) {
+      }
+
+      // ====== TRƯỜNG HỢP NHẬN LỊCH SỬ ======
+      else if (Array.isArray(data) && data[1]?.htr) {
         const htr = data[1].htr;
         const newRecords = [];
         for (const item of htr) {
           if (!sicboResults.some((r) => r.sid === item.sessionId)) {
-            const dices = item.resultRaw.map(Number);
-            newRecords.push({
-              sid: item.sessionId,
-              d1: dices[0],
-              d2: dices[1],
-              d3: dices[2],
-              timestamp: item.st || Date.now(),
-            });
+            const dices = String(item.resultRaw)
+              .split("")
+              .map((n) => parseInt(n));
+            if (dices.length === 3) {
+              newRecords.push({
+                sid: item.sessionId,
+                d1: dices[0],
+                d2: dices[1],
+                d3: dices[2],
+                timestamp: item.st || Date.now(),
+              });
+            }
           }
         }
         if (newRecords.length) {
@@ -158,7 +170,7 @@ app.get("/api/sicbo/live", (req, res) => {
     Xuc_xac_3: current.d3,
     Tong: total,
     Ket_qua: getTX(current.d1, current.d2, current.d3),
-    id: "@hatronghoann",
+    id: "@toolquocthinh",
   });
 });
 
@@ -166,15 +178,19 @@ app.get("/api/sicbo/history", (req, res) => {
   const valid = sicboResults.filter((r) => r.d1 && r.d2 && r.d3);
   if (!valid.length) return res.json({ message: "Không có dữ liệu lịch sử." });
 
-  const lines = valid.map((i) =>
-    JSON.stringify({
-      session: i.sid,
-      dice: [i.d1, i.d2, i.d3],
-      total: i.d1 + i.d2 + i.d3,
-      result: getTX(i.d1, i.d2, i.d3),
-    })
-  );
-  res.set("Content-Type", "text/plain").send(lines.join("\n"));
+  const history = valid.map((i) => ({
+    Phien: i.sid,
+    Xuc_xac: [i.d1, i.d2, i.d3],
+    Tong: i.d1 + i.d2 + i.d3,
+    Ket_qua: getTX(i.d1, i.d2, i.d3),
+    Thoi_gian: new Date(i.timestamp).toLocaleString("vi-VN"),
+  }));
+
+  res.json({
+    id: "@toolquocthinh",
+    tong_so_phien: history.length,
+    lich_su: history,
+  });
 });
 
 // ================= MAIN =================
