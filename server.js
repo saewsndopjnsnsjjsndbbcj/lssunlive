@@ -3,7 +3,7 @@ const http = require("http");
 const WebSocket = require("ws");
 const axios = require("axios");
 
-const PORT = 8000;
+const PORT = process.env.PORT || 10000; // FIX CHO RENDER
 const WS_ID = "mrtinhios";
 const WS_KEY = "vantinhk11pq";
 
@@ -28,7 +28,7 @@ function parseEndData(data) {
   return { phien, xuc_xac, tong, ket_qua };
 }
 
-// Phân tích gói "start" → lấy MD5
+// Lấy MD5 cuối chuỗi
 function extractMd5(data) {
   const match = data.match(/[0-9a-f]{32}$/i);
   return match ? match[0] : null;
@@ -59,10 +59,10 @@ wss.on("connection", (ws, req) => {
   }
 });
 
-// REST API (KHÔNG có status/data bọc ngoài)
+// API trả kết quả
 app.get("/ditmemay/api/68gb/taixiu/mrtinhios", (req, res) => {
   if (latestResult) {
-    res.json(latestResult); // Trả trực tiếp kết quả
+    res.json(latestResult);
   } else {
     res.status(404).json({ message: "Chưa có dữ liệu" });
   }
@@ -81,7 +81,7 @@ setInterval(async () => {
     const keys = Object.keys(data).sort();
     const latest = keys[keys.length - 1];
 
-    if (latestKey === latest) return;
+    if (latestKey === latest) return; // Không trùng phiên
     latestKey = latest;
 
     const item = data[latest];
@@ -118,7 +118,7 @@ setInterval(async () => {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`✅ WebSocket: ws://localhost:${PORT}/?id=${WS_ID}&key=${WS_KEY}`);
-  console.log(`✅ REST API:  http://localhost:${PORT}/api/68gb`);
+  console.log(`🚀 Server chạy trên PORT: ${PORT}`);
+  console.log(`🔗 WebSocket dùng: wss://<tên-app>.onrender.com/?id=${WS_ID}&key=${WS_KEY}`);
+  console.log(`🔗 API: https://<tên-app>.onrender.com/ditmemay/api/68gb/taixiu/mrtinhios`);
 });
-        
