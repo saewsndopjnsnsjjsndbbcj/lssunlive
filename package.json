@@ -1,29 +1,30 @@
 {
-  "name": "taixiu-realtime-server",
+  "name": "sunwin-taixiu-ai-server",
   "version": "1.0.0",
-  "description": "Realtime Taixiu server - Express + WebSocket + Firebase polling",
-  "main": "server.js",
-  "engines": {
-    "node": ">=14"
-  },
+  "description": "API Server for Sunwin Tai Xiu AI Prediction and Real-time WebSocket Feed",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "pm2:start": "pm2 start server.js --name taixiu-server",
-    "pm2:stop": "pm2 stop taixiu-server",
-    "lint": "eslint . || true"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "author": "mrtinh",
-  "license": "MIT",
+  "keywords": [
+    "fastify",
+    "websocket",
+    "taixiu",
+    "sunwin",
+    "ai",
+    "prediction"
+  ],
+  "author": "vantinh597",
+  "license": "ISC",
   "dependencies": {
-    "axios": "^1.7.0",
-    "express": "^4.18.2",
-    "ws": "^8.13.0",
-    "dotenv": "^16.3.1"
+    "@fastify/cors": "^8.5.0",
+    "@fastify/websocket": "^8.3.1",
+    "fastify": "^4.24.3",
+    "sqlite3": "^5.1.7",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22",
-    "pm2": "^5.3.0",
-    "eslint": "^8.47.0"
+    "nodemon": "^3.1.0"
   }
 }
