@@ -2,10 +2,10 @@
   "name": "sunwin-taixiu-ai-server",
   "version": "1.0.0",
   "description": "API Server for Sunwin Tai Xiu AI Prediction and Real-time WebSocket Feed",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "keywords": [
     "fastify",
