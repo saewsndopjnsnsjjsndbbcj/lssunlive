@@ -1,231 +1,109 @@
-// ==UserScript==
-// @name         WS Manager Auto Token (Gemwin)
-// @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Hook WebSocket, lấy token và auto reload sau 18h trên Gemwin
-// @author       Bạn
-// @match        https://play.gemwin.vip/*
-// @grant        none
-// ==/UserScript==
+var dbUrl = "https://bcrapi-default-rtdb.firebaseio.com/
+";
 
-(function() {
-  'use strict';
+(function () {
+  var OriginalWebSocket = window.WebSocket;
 
-  const FIREBASE_URL = "https://fir-data-8026b-default-rtdb.firebaseio.com/tokenfr.json";
-  const RECONNECT_INTERVAL_MS = 4 * 60 * 1000; // 4 phút restart WS
-  const AUTO_RELOAD_HOURS = 18; // reload sau 18h
-  const AUTO_RELOAD_MS = AUTO_RELOAD_HOURS * 60 * 60 * 1000;
+  // Auto clear console mỗi 30s
+  setInterval(() => {
+    console.clear();
+    console.log("🧹 Console đã được dọn tự động sau 30s");
+  }, 30000);
 
-  let countdownMs = RECONNECT_INTERVAL_MS;
-  let countdownTimer = null;
-  let wsInstance = null;
-  let cleanupFns = [];
-  let lastRestartAt = null;
+  window.WebSocket = function (url, protocols) {
+    var ws = protocols ? new OriginalWebSocket(url, protocols) : new OriginalWebSocket(url);
 
-  /* ---------- Firebase save (PUT - ghi đè) ---------- */
-  function saveFixData(packet) {
-    fetch(FIREBASE_URL, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: packet, ts: Date.now(), type: "send" })
-    })
-    .then(r => r.json())
-    .then(res => console.log("✅ Đã ghi Firebase:", res))
-    .catch(e => console.error("❌ Firebase lỗi:", e));
-  }
+    ws.addEventListener("message", async function (event) {
+      try {
+        var text;
 
-  /* ---------- Overlay UI ---------- */
-  function createOverlay() {
-    if (document.getElementById("ws-manager-overlay")) return;
+        // Giải mã dữ liệu nhận từ WebSocket
+        if (event.data instanceof ArrayBuffer) {
+          text = new TextDecoder("utf-8").decode(event.data);
+        } else if (typeof event.data === "string") {
+          text = event.data;
+        } else {
+          return;
+        }
 
-    const box = document.createElement("div");
-    box.id = "ws-manager-overlay";
-    box.style = `
-      position: fixed; top: 10px; right: 10px; z-index: 2147483647;
-      background: rgba(0,0,0,0.9); color: #cfc; padding: 12px;
-      font-family: monospace; font-size: 13px; width: 360px;
-      border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.6);
-    `;
+        // Lọc dữ liệu game start / end
+        if (text.includes("mnmdsbgamestart") || text.includes("mnmdsbgameend")) {
+          var dicesMatch = text.match(/\{(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\}/);
+          if (!dicesMatch) return;
 
-    box.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-weight:700">WS Manager</div>
-        <button id="ws-force-btn" style="background:#2b2; border:none; padding:6px 8px; border-radius:6px; cursor:pointer">Force reconnect</button>
-      </div>
-      <hr style="margin:8px 0; border:none; border-top:1px solid rgba(255,255,255,0.06)" />
-      <div style="max-height:120px; overflow:auto; margin-bottom:8px;">
-        <div><b>🔑 Token:</b> <span id="ws-token">—</span></div>
-        <div style="margin-top:6px"><b>🖊 Signature:</b> <span id="ws-sign">—</span></div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-        <div style="flex:1">
-          <div style="font-size:12px;color:#ddd">Next reconnect in</div>
-          <div id="ws-countdown" style="font-size:18px;font-weight:700">--:--</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:12px;color:#ddd">Last restart</div>
-          <div id="ws-last" style="font-size:12px">—</div>
-        </div>
-      </div>
-      <div style="font-size:12px;color:#aaa">Logs:</div>
-      <pre id="ws-log" style="height:80px; overflow:auto; background:rgba(0,0,0,0.2); padding:6px; border-radius:6px; margin-top:6px; color:#bff">ready...</pre>
-    `;
+          var dice1 = parseInt(dicesMatch[1], 10);
+          var dice2 = parseInt(dicesMatch[2], 10);
+          var dice3 = parseInt(dicesMatch[3], 10);
 
-    document.body.appendChild(box);
+          if (isNaN(dice1) || isNaN(dice2) || isNaN(dice3)) return;
 
-    document.getElementById("ws-force-btn").addEventListener("click", () => {
-      logToUI("Manual force reconnect pressed");
-      doRestartCycle();
-    });
-  }
+          var total = dice1 + dice2 + dice3;
+          var result = total > 10 ? "Tài" : "Xỉu";
 
-  function logToUI(msg) {
-    const el = document.getElementById("ws-log");
-    if (!el) return;
-    const t = new Date().toLocaleTimeString();
-    el.textContent = `[${t}] ${msg}\n` + el.textContent;
-  }
+          var sessionMatch = text.match(/#(\d+)[_\-]/);
+          var sessionNumber = sessionMatch ? parseInt(sessionMatch[1], 10) : null;
+          if (!sessionNumber) return;
 
-  function updateOverlayToken(token, signature) {
-    const tEl = document.getElementById("ws-token");
-    const sEl = document.getElementById("ws-sign");
-    if (tEl) tEl.textContent = token || "—";
-    if (sEl) sEl.textContent = signature || "—";
-  }
+          var payload = {
+            "Phien": sessionNumber,
+            "xuc_xac_1": dice1,
+            "xuc_xac_2": dice2,
+            "xuc_xac_3": dice3,
+            "tong": total,
+            "ket_qua": result
+          };
 
-  function updateOverlayCountdown(ms) {
-    const el = document.getElementById("ws-countdown");
-    if (!el) return;
-    const seconds = Math.max(0, Math.floor(ms / 1000));
-    const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-    const ss = String(seconds % 60).padStart(2, "0");
-    el.textContent = `${mm}:${ss}`;
-  }
+          console.log("📥 Ghi đè dữ liệu:", payload);
 
-  function updateLastRestart() {
-    const el = document.getElementById("ws-last");
-    if (!el) return;
-    el.textContent = lastRestartAt ? new Date(lastRestartAt).toLocaleString() : "—";
-  }
+          try {
+            // Ghi đè toàn bộ file taixiu_sessions.json
+            let res = await fetch(`${dbUrl}/taixiu_sessions.json`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
 
-  /* ---------- Token/signature extraction ---------- */
-  function extractTokenAndSignature(packet) {
-    try {
-      const infoStr = packet[4] && packet[4].info;
-      const signature = packet[4] && packet[4].signature;
-      if (!infoStr) return { token: null, signature: signature || null };
-      const infoObj = JSON.parse(infoStr);
-      return { token: infoObj.wsToken || null, signature: signature || null };
-    } catch (e) {
-      console.warn("⚠️ parse info error", e);
-      return { token: null, signature: null };
-    }
-  }
+            if (res.ok) {
+              console.log("✅ Đã ghi đè dữ liệu vào taixiu_sessions.json");
 
-  /* ---------- Hook WebSocket ---------- */
-  function installWSHook() {
-    if (window.__WS_HOOK_INSTALLED) return;
-    window.__WS_HOOK_INSTALLED = true;
-
-    const NativeWS = window.WebSocket;
-    const ProxyWS = new Proxy(NativeWS, {
-      construct(target, args) {
-        const ws = new target(...args);
-        wsInstance = ws;
-        logToUI("WebSocket constructed: " + (args && args[0] ? args[0] : "unknown-url"));
-
-        cleanupFns.forEach(fn => { try { fn(); } catch{} });
-        cleanupFns = [];
-
-        const origSend = ws.send;
-        ws.send = function(data) {
-          let parsed = data;
-          if (typeof data === "string") {
-            try { parsed = JSON.parse(data); } catch {}
+              // Hiển thị trên giao diện chính
+              let container = document.getElementById("taixiu-result");
+              if (!container) {
+                container = document.createElement("div");
+                container.id = "taixiu-result";
+                container.style.position = "fixed";
+                container.style.top = "10px";
+                container.style.right = "10px";
+                container.style.padding = "12px";
+                container.style.background = "rgba(0,0,0,0.85)";
+                container.style.color = "#0f0";
+                container.style.fontSize = "14px";
+                container.style.fontFamily = "monospace";
+                container.style.borderRadius = "8px";
+                container.style.zIndex = "99999";
+                container.style.minWidth = "180px";
+                document.body.appendChild(container);
+              }
+              container.innerHTML = `
+                <b>Phiên #${payload.Phien}</b><br>
+                🎲 ${payload.xuc_xac_1} - ${payload.xuc_xac_2} - ${payload.xuc_xac_3}<br>
+                ➕ Tổng: ${payload.tong}<br>
+                ✅ Kết quả: <b>${payload.ket_qua}</b>
+              `;
+            } else {
+              console.error("❌ Lỗi ghi đè:", res.status);
+            }
+          } catch (err) {
+            console.error("❌ Lỗi fetch lưu phiên:", err);
           }
-
-          if (
-            Array.isArray(parsed) &&
-            parsed.length >= 5 &&
-            parsed[0] === 1 &&
-            parsed[1] === "MiniGame" &&
-            parsed[2] === "GM_hnam14zz" &&
-            (parsed[3] === "hnam1402" || parsed[3] === hnam1402)
-          ) {
-            logToUI("Matched SEND packet");
-            const { token, signature } = extractTokenAndSignature(parsed);
-            updateOverlayToken(token || "❌ Không có token", signature || "❌ Không có signature");
-            saveFixData(parsed);
-          }
-
-          return origSend.apply(this, arguments);
-        };
-
-        const onClose = () => logToUI("WebSocket closed");
-        ws.addEventListener("close", onClose);
-        cleanupFns.push(() => ws.removeEventListener("close", onClose));
-
-        return ws;
+        }
+      } catch (err) {
+        console.error("❌ Lỗi khi xử lý WebSocket:", err);
       }
     });
 
-    window.WebSocket = ProxyWS;
-    logToUI("WS hook installed");
-  }
+    return ws;
+  };
 
-  /* ---------- Restart cycle ---------- */
-  function cleanupWS() {
-    logToUI("Cleaning up WS...");
-    try {
-      cleanupFns.forEach(fn => { try { fn(); } catch{} });
-      cleanupFns = [];
-      if (wsInstance && typeof wsInstance.close === "function") {
-        try { wsInstance.close(); } catch(e) { console.warn(e); }
-      }
-      wsInstance = null;
-    } catch (e) {
-      console.warn("Error during cleanup:", e);
-    }
-  }
-
-  function doRestartCycle() {
-    cleanupWS();
-    setTimeout(() => {
-      installWSHook();
-      lastRestartAt = Date.now();
-      updateLastRestart();
-      logToUI("Restart cycle completed");
-    }, 200);
-    countdownMs = RECONNECT_INTERVAL_MS;
-    updateOverlayCountdown(countdownMs);
-  }
-
-  /* ---------- Countdown ---------- */
-  function startCountdown() {
-    if (countdownTimer) return;
-    countdownTimer = setInterval(() => {
-      countdownMs -= 1000;
-      if (countdownMs <= 0) {
-        updateOverlayCountdown(0);
-        logToUI("Countdown reached 0 -> performing restart");
-        doRestartCycle();
-      } else {
-        updateOverlayCountdown(countdownMs);
-      }
-    }, 1000);
-  }
-
-  /* ---------- Auto reload sau 18h ---------- */
-  setTimeout(() => {
-    logToUI("⏰ Auto reload sau 18h để lấy token mới");
-    location.reload();
-  }, AUTO_RELOAD_MS);
-
-  /* ---------- Init ---------- */
-  createOverlay();
-  installWSHook();
-  updateOverlayCountdown(countdownMs);
-  startCountdown();
-  updateLastRestart();
-  logToUI("WS Manager started. Auto-restart every " + (RECONNECT_INTERVAL_MS/60000) + " minutes. Auto-reload every " + AUTO_RELOAD_HOURS + "h");
+  window.WebSocket.prototype = OriginalWebSocket.prototype;
 })();
