@@ -1,109 +1,81 @@
-var dbUrl = "https://bcrapi-default-rtdb.firebaseio.com/
-";
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>SunWin Live Result</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-(function () {
-  var OriginalWebSocket = window.WebSocket;
+  <style>
+    #taixiu-popup {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 14px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #00ff90;
+      font-family: monospace;
+      font-size: 15px;
+      border-radius: 10px;
+      z-index: 99999;
+      min-width: 200px;
+      box-shadow: 0 0 10px #000;
+      transition: transform .15s ease-in-out, opacity .2s;
+    }
 
-  // Auto clear console mỗi 30s
-  setInterval(() => {
-    console.clear();
-    console.log("🧹 Console đã được dọn tự động sau 30s");
-  }, 30000);
+    /* Animation nhẹ */
+    .flash {
+      transform: scale(1.05);
+      opacity: 0.7;
+    }
+  </style>
+</head>
 
-  window.WebSocket = function (url, protocols) {
-    var ws = protocols ? new OriginalWebSocket(url, protocols) : new OriginalWebSocket(url);
+<body style="background:#111; color:white; text-align:center; padding-top:40px;">
 
-    ws.addEventListener("message", async function (event) {
+  <h2>🔴 LIVE KẾT QUẢ TÀI XỈU</h2>
+  <p>Dữ liệu luôn cập nhật theo Firebase realtime.</p>
+
+  <div id="taixiu-popup">⏳ Đang tải dữ liệu...</div>
+
+  <script>
+    const dbUrl = "https://bcrapi-default-rtdb.firebaseio.com/taixiu_sessions.json";
+
+    let lastPhien = null;
+
+    async function loadData() {
       try {
-        var text;
+        const res = await fetch(dbUrl + "?t=" + Date.now());
+        const data = await res.json();
+        if (!data || !data.Phien) return;
 
-        // Giải mã dữ liệu nhận từ WebSocket
-        if (event.data instanceof ArrayBuffer) {
-          text = new TextDecoder("utf-8").decode(event.data);
-        } else if (typeof event.data === "string") {
-          text = event.data;
-        } else {
-          return;
+        const popup = document.getElementById("taixiu-popup");
+
+        // Nếu phiên mới → tạo animation
+        if (lastPhien !== data.Phien) {
+          popup.classList.add("flash");
+          setTimeout(() => popup.classList.remove("flash"), 250);
+          lastPhien = data.Phien;
         }
 
-        // Lọc dữ liệu game start / end
-        if (text.includes("mnmdsbgamestart") || text.includes("mnmdsbgameend")) {
-          var dicesMatch = text.match(/\{(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\}/);
-          if (!dicesMatch) return;
+        // Render giao diện
+        popup.innerHTML = `
+          <b>Phiên #${data.Phien}</b><br>
+          🎲 ${data.xuc_xac_1} - ${data.xuc_xac_2} - ${data.xuc_xac_3}<br>
+          ➕ Tổng: ${data.tong}<br>
+          🟢 Kết quả: <b>${data.ket_qua}</b>
+        `;
 
-          var dice1 = parseInt(dicesMatch[1], 10);
-          var dice2 = parseInt(dicesMatch[2], 10);
-          var dice3 = parseInt(dicesMatch[3], 10);
-
-          if (isNaN(dice1) || isNaN(dice2) || isNaN(dice3)) return;
-
-          var total = dice1 + dice2 + dice3;
-          var result = total > 10 ? "Tài" : "Xỉu";
-
-          var sessionMatch = text.match(/#(\d+)[_\-]/);
-          var sessionNumber = sessionMatch ? parseInt(sessionMatch[1], 10) : null;
-          if (!sessionNumber) return;
-
-          var payload = {
-            "Phien": sessionNumber,
-            "xuc_xac_1": dice1,
-            "xuc_xac_2": dice2,
-            "xuc_xac_3": dice3,
-            "tong": total,
-            "ket_qua": result
-          };
-
-          console.log("📥 Ghi đè dữ liệu:", payload);
-
-          try {
-            // Ghi đè toàn bộ file taixiu_sessions.json
-            let res = await fetch(`${dbUrl}/taixiu_sessions.json`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-
-            if (res.ok) {
-              console.log("✅ Đã ghi đè dữ liệu vào taixiu_sessions.json");
-
-              // Hiển thị trên giao diện chính
-              let container = document.getElementById("taixiu-result");
-              if (!container) {
-                container = document.createElement("div");
-                container.id = "taixiu-result";
-                container.style.position = "fixed";
-                container.style.top = "10px";
-                container.style.right = "10px";
-                container.style.padding = "12px";
-                container.style.background = "rgba(0,0,0,0.85)";
-                container.style.color = "#0f0";
-                container.style.fontSize = "14px";
-                container.style.fontFamily = "monospace";
-                container.style.borderRadius = "8px";
-                container.style.zIndex = "99999";
-                container.style.minWidth = "180px";
-                document.body.appendChild(container);
-              }
-              container.innerHTML = `
-                <b>Phiên #${payload.Phien}</b><br>
-                🎲 ${payload.xuc_xac_1} - ${payload.xuc_xac_2} - ${payload.xuc_xac_3}<br>
-                ➕ Tổng: ${payload.tong}<br>
-                ✅ Kết quả: <b>${payload.ket_qua}</b>
-              `;
-            } else {
-              console.error("❌ Lỗi ghi đè:", res.status);
-            }
-          } catch (err) {
-            console.error("❌ Lỗi fetch lưu phiên:", err);
-          }
-        }
       } catch (err) {
-        console.error("❌ Lỗi khi xử lý WebSocket:", err);
+        console.error("Lỗi tải Firebase:", err);
       }
-    });
+    }
 
-    return ws;
-  };
+    // Tự cập nhật mỗi 1 giây
+    setInterval(loadData, 1000);
 
-  window.WebSocket.prototype = OriginalWebSocket.prototype;
-})();
+    // Load lần đầu
+    loadData();
+  </script>
+
+</body>
+</html>
